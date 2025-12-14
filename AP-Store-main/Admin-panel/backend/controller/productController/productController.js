@@ -1,6 +1,6 @@
 import productModel from "../../model/productModel/productModel.js";
 
-// Create a new product (admin only)
+// ✅ Create a new product (admin only)
 export const createData = async (req, res) => {
   try {
     console.log("📦 req.body:", req.body);
@@ -26,7 +26,7 @@ export const createData = async (req, res) => {
   }
 };
 
-// Get all products (public)
+// ✅ Get all products (public)
 export const getData = async (req, res) => {
   try {
     const products = await productModel.find({});
@@ -43,48 +43,64 @@ export const getData = async (req, res) => {
   }
 };
 
-// Get product by ID (public)
+// ✅ Get product by ID (public)
 export const getProductById = async (req, res) => {
   const { id } = req.params;
 
   try {
     const product = await productModel.findById(id);
+    
+    // 1. Check if product exists
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
+
+    // 2. Success response
     res.status(200).json({
       message: "Product fetched successfully",
       data: product,
     });
   } catch (error) {
     console.error("Error fetching product:", error);
+
+    // 3. Handle Invalid ID format (prevents 500 crash)
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "Invalid Product ID format" });
+    }
+
     res.status(500).json({
       message: "Error fetching product",
       error: error.message,
     });
   }
 };
+// controller/productController/productController.js
 
-// Update product by ID (admin only)
 export const updateData = async (req, res) => {
   const { id } = req.params;
   const { name, price, description } = req.body;
 
-  // Default to old image if no new file is uploaded
-  let image = req.body.image;
-
-  // If new image is uploaded, override image value
-  if (req.file) {
-    image = req.file.filename;
-  }
-
   try {
+    // 1. Prepare the update object
+    const updateFields = {
+      name,
+      price,
+      description,
+    };
+
+    // 2. Only update image if a NEW file was uploaded
+    // (If no file is uploaded, we don't touch the 'image' field, so the old one stays)
+    if (req.file) {
+      updateFields.image = req.file.filename;
+    }
+
+    // 3. Update in Database
     const updatedProduct = await productModel.findByIdAndUpdate(
       id,
-      { name, price, image, description },
+      updateFields,
       {
-        new: true, // return updated document
-        runValidators: true, // validate fields before update
+        new: true, // Return the updated document
+        runValidators: true, // Ensure price is a number, etc.
       }
     );
 
@@ -97,15 +113,19 @@ export const updateData = async (req, res) => {
       data: updatedProduct,
     });
   } catch (error) {
-    console.error("Error updating product:", error);
+    console.error("❌ Error updating product:", error);
+
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "Invalid Product ID format" });
+    }
+
     res.status(500).json({
       message: "Failed to update product",
       error: error.message,
     });
   }
 };
-
-// Delete product by ID (admin only)
+// ✅ Delete product by ID (admin only)
 export const deleteData = async (req, res) => {
   const { id } = req.params;
 
@@ -122,6 +142,12 @@ export const deleteData = async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting product:", error);
+
+    // Handle Invalid ID format
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "Invalid Product ID format" });
+    }
+
     res.status(500).json({
       message: "Failed to delete product",
       error: error.message,
